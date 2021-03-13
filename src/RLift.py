@@ -9,9 +9,12 @@ from SimulationData import SimulationData
 # import logging
 # import logging.handlers
 # from metrics import same_diff, general_respone, qini_q, qini_Q, qini_discrete
-from metrics import IPS, SN_IPS, SN_IPS_v2, same_diff
+from metrics import UMG, SN_UMG, SN_UMG_v2, same_diff
 # import A3C.config as drlflow_conf
 import tensorflow as tf
+# import tensorflow.compat.v1 as tf
+# tf.disable_v2_behavior()
+
 import time
 # LOG_FILE = 'output.log'
 #
@@ -84,11 +87,11 @@ class RLift:
                  n_action,
                  name_data,
                  metric,
-                 reward_design,
                  Zero_is_Action,
                  hidden_layers,
                  train_eval_func,
                  test_eval_func,
+                 reward_design='action_depend_baseline',
                  model_base=None,
                  validate_max_steps=1000,
                  size_bag=5000,
@@ -236,7 +239,7 @@ class RLift:
                 # bag_rewards_qini[eid] = qini_Q(
                 #     record=record, n_action=self.n_action)
                 eval_res = self.train_eval_func(records=records, treatment_weight=self.treatment_weight,
-                                          treatment_keys=self.treatment_keys, n_action=self.n_action)
+                                                treatment_keys=self.treatment_keys, n_action=self.n_action)
 
                 bag_rewards[eid] = eval_res['reward']
                 algo_treatment = eval_res['response']
@@ -258,7 +261,7 @@ class RLift:
 
                     val_next = bag_rewards[eid]
 
-                    if self.reward_design == 'same_diff':
+                    if self.reward_design == 'UMG':
                         # print('reward_design is same diff')
                         # print('algo_action', algo_action, 'real_action', real_action)
                         if algo_action == real_action or real_action == 0:
@@ -287,157 +290,6 @@ class RLift:
 
                             if self.Zero_is_Action is False:
                                 algo_action -= 1
-                            tran.append(
-                                state=data[0], real_action=real_action, algo_action=algo_action, reward=rwd)
-
-                    elif self.reward_design == 'response_yebai':
-                        rwd = (response - value_next)
-                        if self.Zero_is_Action is False:
-                            algo_action -= 1
-                        tran.append(
-                            state=data[0], real_action=real_action, algo_action=real_action, reward=rwd)
-
-                    elif self.reward_design == 'response_only':
-                        if real_action == algo_action:
-                            rwd = response - algo_action_base[0][algo_action]
-                            if self.Zero_is_Action is False:
-                                algo_action -= 1
-                            tran.append(
-                                state=data[0], real_action=real_action, algo_action=algo_action, reward=rwd)
-
-                    elif self.reward_design == 'delayed_reward_only':
-                        if real_action == algo_action:
-                            rwd = val_next
-                            if self.Zero_is_Action is False:
-                                algo_action -= 1
-                            tran.append(
-                                state=data[0], real_action=real_action, algo_action=real_action, reward=rwd)
-                    elif self.reward_design == 'variance_add':
-                        if real_action == algo_action:
-                            if algo_action == real_action or real_action == 0:
-                                if real_action > 0:
-                                    rwd = (response - algo_control) + val_next - 0.1 * variance
-                                else:
-                                    rwd = -(response - algo_control) + val_next - 0.1 * variance
-
-                                if self.Zero_is_Action is False:
-                                    algo_action -= 1
-                                tran.append(
-                                    state=data[0], real_action=real_action, algo_action=algo_action, reward=rwd)
-                    elif self.reward_design == 'response_baseline':
-                        # if algo_action > 0:
-                        if algo_action == real_action or real_action == 0:
-                            if real_action > 0:
-                                rwd = (response - algo_control)
-                            else:
-                                rwd = -(response - algo_control)
-
-                            if self.Zero_is_Action is False:
-                                algo_action -= 1
-
-                            # print('reward', rwd)
-                            tran.append(
-                                state=data[0], real_action=real_action, algo_action=algo_action, reward=rwd)
-                    elif self.reward_design == 'response_baseline':
-                        if algo_action == real_action or real_action == 0:
-                            base = self.model_base.predict(feature)
-                            if real_action > 0:
-                                rwd = (response - base) + val_next
-                            else:
-                                rwd = -(response - base) + val_next
-
-                            if self.Zero_is_Action is False:
-                                algo_action -= 1
-                            tran.append(
-                                state=data[0], real_action=real_action, algo_action=algo_action, reward=rwd)
-
-                    elif self.reward_design == 'action_prob_control':
-                        # if algo_action == real_action or real_action == 0:
-                            if algo_action == real_action:
-                                rwd = (response - algo_control) + val_next - (max(algo_probs) - 1.0 / self.n_action)
-                            else:
-                                rwd = -(response - algo_treatment) + val_next - (max(algo_probs) - 1.0 / self.n_action)
-
-                            if self.Zero_is_Action is False:
-                                algo_action -= 1
-                            tran.append(
-                                state=data[0], real_action=real_action, algo_action=algo_action, reward=rwd)
-                    elif self.reward_design == 'same_diff_all':
-                        if algo_action == real_action or real_action == 0:
-                            if algo_action == real_action:
-                                rwd = (response - algo_control) + val_next
-                            else:
-                                rwd = -(response - algo_control) + val_next
-                            if self.Zero_is_Action is False:
-                                algo_action -= 1
-                            tran.append(
-                                state=data[0], real_action=real_action, algo_action=algo_action, reward=rwd)
-                    elif self.reward_design == 'response_substract_baseline':
-                        if algo_action == real_action or real_action == 0:
-                            if algo_action == real_action:
-                                rwd = (response - val_next) + val_next
-                            elif real_action == 0:
-                                rwd = -(response - val_next) + val_next
-                            if self.Zero_is_Action is False:
-                                algo_action -= 1
-                            tran.append(
-                                state=data[0], real_action=real_action, algo_action=algo_action, reward=rwd)
-                    elif self.reward_design == 'pure_lift':
-                        # if algo_action == real_action:
-                        rwd = (response - algo_control) + val_next
-                        # else:
-                        #     rwd = -(response - algo_control) + val_next
-                        if self.Zero_is_Action is False:
-                            algo_action -= 1
-
-                        tran.append(
-                            state=data[0], real_action=real_action, algo_action=algo_action, reward=rwd)
-
-                    elif self.reward_design == 'self_normalize_action_baseline_no_prob':
-                        if real_action > 0:
-                            rwd = val_next + (response)
-                        else:
-                            rwd = val_next - (response)
-
-                        if self.Zero_is_Action is False:
-                            algo_action -= 1
-
-                        tran.append(
-                            state=data[0], real_action=real_action, algo_action=real_action, reward=rwd)
-
-                    elif self.reward_design == 'self_normalize_action_baseline':
-                        if real_action > 0:
-                            rwd = val_next + (response * algo_prob[real_action] / 0.2 - algo_action_base[0][real_action])
-                        else:
-                            rwd = val_next - (response * algo_prob[real_action] / 0.2- algo_action_base[0][real_action])
-
-                        if self.Zero_is_Action is False:
-                            algo_action -= 1
-
-                        tran.append(
-                            state=data[0], real_action=real_action, algo_action=real_action, reward=rwd)
-
-                    elif self.reward_design == 'self_normalize_total_baseline':
-                        if real_action > 0:
-                            rwd = val_next + (response * algo_prob[real_action] / 0.2 - algo_control)
-                        else:
-                            rwd = val_next - (response * algo_prob[real_action] / 0.2- algo_control)
-
-                        if self.Zero_is_Action is False:
-                            algo_action -= 1
-
-                        tran.append(
-                            state=data[0], real_action=real_action, algo_action=real_action, reward=rwd)
-                    elif self.reward_design == 'important_sampling_identity_action_baseline':
-                        if algo_action == real_action or real_action > 0:
-                            if algo_action == real_action:
-                                rwd = val_next + (response - algo_action_base[0][algo_action]) / 0.2
-                            else:
-                                rwd = val_next - (response - algo_action_base[0][algo_action]) / 0.2
-
-                            if self.Zero_is_Action is False:
-                                algo_action -= 1
-
                             tran.append(
                                 state=data[0], real_action=real_action, algo_action=algo_action, reward=rwd)
                     else:
@@ -598,8 +450,7 @@ class RLift:
         # for i, a in enumerate(actions_algo):
         #     record.append([int(a), datas[i][1], datas[i][2], None])
 
-
-            # for i, (a, data, prob) in enumerate(zip(actions_algo, datas, probs)):
+        # for i, (a, data, prob) in enumerate(zip(actions_algo, datas, probs)):
         for i, (data, action, prob) in enumerate(zip(datas, actions_algo, probs)):
             # action = int(actions_algo[0])
             # prob = probs[0]
@@ -639,6 +490,7 @@ def model_baseline(datas):
     regr.fit(np.array(X), np.array(y))
     return regr
 
+
 if __name__ == '__main__':
     # reader = DataReader(action=['womens'], label='visit')
     # trains, validates, tests = reader.get_datas()
@@ -653,8 +505,8 @@ if __name__ == '__main__':
     rlift = RLift(name_data=reader.name,
                   trains=trains, validates=validates, tests=tests, hidden_layers=[
                       64],
-                  n_feature=reader.n_feature, size_bag=10000, validate_max_steps=1000, reward_design='important_sampling_identity_action_baseline',
-                  n_action=5, n_bags=10, train_eval_func=SN_IPS_v2, test_eval_func=IPS,
+                  n_feature=reader.n_feature, size_bag=10000, validate_max_steps=1000, reward_design='action_depend_baseline',
+                  n_action=5, n_bags=10, train_eval_func=SN_UMG_v2, test_eval_func=UMG,
                   model_base=baseline,
-                  metric='SN_IPS_v2', Zero_is_Action=True, isLoad=False)
+                  metric='SN_UMG_v2', Zero_is_Action=True, isLoad=False)
     rlift.train()

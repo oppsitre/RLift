@@ -344,7 +344,7 @@ def same_diff_v2(records, treatment_weight, treatment_keys, n_action=5):
     return algo_lifts, sample_lifts, sum_actions, sample_actions, lift_treatment, lift_control, sample_treatment, sample_control
 
 
-def SN_IPS(records, treatment_weight, treatment_keys, n_action):
+def SN_UMG(records, treatment_weight, treatment_keys, n_action):
     '''
     Self Normalized IPS metric for unbiased dataset
     Inputs:
@@ -544,7 +544,7 @@ def SN_IPS(records, treatment_weight, treatment_keys, n_action):
     return res
 
 
-def SN_IPS_v2(records, treatment_weight, treatment_keys, n_action):
+def SN_UMG_v2(records, treatment_weight, treatment_keys, n_action):
     '''
     Self Normalized IPS metric for unbiased dataset
     Inputs:
@@ -742,7 +742,7 @@ def SN_IPS_v2(records, treatment_weight, treatment_keys, n_action):
     return res
 
 
-def IPS(records, treatment_weight, treatment_keys, n_action):
+def UMG(records, treatment_weight, treatment_keys, n_action):
     '''
     IPS metric for unbiased dataset
     Inputs:
